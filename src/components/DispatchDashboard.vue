@@ -3,13 +3,9 @@ import { onBeforeUnmount, onMounted, ref } from 'vue'
 import axios from 'axios'
 import { useRouter } from 'vue-router'
 
-defineProps({
-  onLogout: Function
-})
-
 const router = useRouter()
-const userName = ref('')
-const userRole = 'Admin'
+const userName = ref('Dispatch User')
+const userRole = 'Dispatch'
 const authCheckMessage = ref('')
 const showUserMenu = ref(false)
 const userMenuRef = ref(null)
@@ -30,9 +26,11 @@ const goToSettings = () => {
 const handleLogout = () => {
   localStorage.removeItem('authToken')
   localStorage.removeItem('authRole')
+  localStorage.removeItem('authFirstName')
+  localStorage.removeItem('authLastName')
   delete axios.defaults.headers.common.Authorization
   closeUserMenu()
-  router.push('/AdminSignIn')
+  router.push('/dispatcher')
 }
 
 const handleClickOutside = (event) => {
@@ -41,17 +39,17 @@ const handleClickOutside = (event) => {
   }
 }
 
-const verifyAdminSession = async () => {
+const verifyDispatcherSession = async () => {
   const token = localStorage.getItem('authToken')
   const role = localStorage.getItem('authRole')
 
-  if (!token || role !== '1') {
-    router.push('/AdminSignIn')
+  if (!token || role !== '2') {
+    router.push('/dispatcher')
     return
   }
 
   try {
-    const response = await axios.get('http://127.0.0.1:8000/api/admin/dashboard/', {
+    const response = await axios.get('http://127.0.0.1:8000/api/dispatch/dashboard/', {
       headers: {
         Authorization: `Bearer ${token}`
       }
@@ -61,24 +59,25 @@ const verifyAdminSession = async () => {
     const lastName = response.data?.last_name || ''
     const fullName = `${firstName} ${lastName}`.trim()
 
-    userName.value = fullName || 'Admin User'
-
-    authCheckMessage.value = response.data?.message || 'Authenticated admin session verified.'
+    userName.value = fullName || 'Dispatch User'
+    authCheckMessage.value = response.data?.message || 'Authenticated dispatcher session verified.'
   } catch (error) {
     if (error.response && (error.response.status === 401 || error.response.status === 403)) {
       localStorage.removeItem('authToken')
       localStorage.removeItem('authRole')
-      router.push('/AdminSignIn')
+      localStorage.removeItem('authFirstName')
+      localStorage.removeItem('authLastName')
+      router.push('/dispatcher')
       return
     }
 
-    authCheckMessage.value = 'Network error while verifying admin session.'
+    authCheckMessage.value = 'Network error while verifying dispatcher session.'
   }
 }
 
 onMounted(() => {
   document.addEventListener('click', handleClickOutside)
-  verifyAdminSession()
+  verifyDispatcherSession()
 })
 
 onBeforeUnmount(() => {
@@ -88,40 +87,37 @@ onBeforeUnmount(() => {
 
 <template>
   <div class="dashboard-container">
-    <!-- Sidebar -->
     <div class="sidebar">
       <div class="logo-section">
         <img src="@/assets/images/PULSE OG.png" alt="PULSE Logo" class="logo" />
-        <span class="logo-text">PULSE Admin</span>
+        <span class="logo-text">PULSE Dispatch</span>
       </div>
-      
+
       <nav class="nav-menu">
         <a href="#" class="nav-item active">
           <span class="icon">📊</span>
           <span>Dashboard</span>
         </a>
         <a href="#" class="nav-item">
-          <span class="icon">👥</span>
-          <span>User Management</span>
+          <span class="icon">🚨</span>
+          <span>Emergencies</span>
         </a>
         <a href="#" class="nav-item">
-          <span class="icon">📰</span>
-          <span>News & Events</span>
+          <span class="icon">🚓</span>
+          <span>Dispatch</span>
         </a>
       </nav>
-      
+
       <div class="security-section">
-        <div class="section-title">SECURITY</div>
+        <div class="section-title">OPERATIONS</div>
         <a href="#" class="nav-item">
           <span class="icon">📋</span>
-          <span>Logs</span>
+          <span>Reports</span>
         </a>
       </div>
     </div>
 
-    <!-- Main Content -->
     <div class="main-content">
-      <!-- Top Bar -->
       <div class="top-bar">
         <button class="menu-btn">← Menu</button>
         <div class="search-container">
@@ -145,7 +141,6 @@ onBeforeUnmount(() => {
         </div>
       </div>
 
-      <!-- Dashboard Content -->
       <div class="content">
         <div class="header-section">
           <h1>PULSE System Analytics</h1>
@@ -154,7 +149,6 @@ onBeforeUnmount(() => {
           <div class="time-display">04:10:14 PM</div>
         </div>
 
-        <!-- Stats Cards -->
         <div class="stats-grid">
           <div class="stat-card">
             <div class="stat-icon users">👥</div>
@@ -193,7 +187,6 @@ onBeforeUnmount(() => {
           </div>
         </div>
 
-        <!-- Charts Section -->
         <div class="charts-grid">
           <div class="chart-card">
             <h3>Total Emergency Reports</h3>
@@ -231,9 +224,8 @@ onBeforeUnmount(() => {
           </div>
         </div>
 
-        <!-- Footer -->
         <div class="dashboard-footer">
-          <p>PULSE CEDOC Administration Panel</p>
+          <p>PULSE CEDOC Dispatch Panel</p>
           <div class="footer-links">
             <a href="#">Term & Conditions</a>
             <a href="#">Privacy & Security</a>
@@ -258,7 +250,6 @@ onBeforeUnmount(() => {
   font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif;
 }
 
-/* Sidebar */
 .sidebar {
   width: 256px;
   background: white;
@@ -331,14 +322,12 @@ onBeforeUnmount(() => {
   letter-spacing: 0.5px;
 }
 
-/* Main Content */
 .main-content {
   flex: 1;
   display: flex;
   flex-direction: column;
 }
 
-/* Top Bar */
 .top-bar {
   background: white;
   display: flex;
@@ -468,7 +457,6 @@ onBeforeUnmount(() => {
   color: #dc2626;
 }
 
-/* Content Area */
 .content {
   flex: 1;
   padding: 30px;
@@ -500,7 +488,6 @@ onBeforeUnmount(() => {
   font-size: 14px;
 }
 
-/* Stats Grid */
 .stats-grid {
   display: grid;
   grid-template-columns: repeat(auto-fit, minmax(250px, 1fr));
@@ -567,7 +554,6 @@ onBeforeUnmount(() => {
   color: #10b981;
 }
 
-/* Charts Grid */
 .charts-grid {
   display: grid;
   grid-template-columns: repeat(auto-fit, minmax(400px, 1fr));
@@ -697,7 +683,6 @@ onBeforeUnmount(() => {
   font-weight: 600;
 }
 
-/* Footer */
 .dashboard-footer {
   color: #9ca3af;
   font-size: 12px;

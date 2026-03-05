@@ -1,4 +1,6 @@
 <script setup>
+import { ref } from 'vue'
+import axios from 'axios'
 import { useRouter } from 'vue-router'
 
 const props = defineProps({
@@ -6,6 +8,9 @@ const props = defineProps({
 })
 
 const router = useRouter()
+const email = ref('')
+const password = ref('')
+const errorMessage = ref('')
 
 const goBack = () => {
   if (typeof props.onBack === 'function') {
@@ -16,9 +21,67 @@ const goBack = () => {
   router.push('/')
 }
 
-const handleSignIn = () => {
-  // Handle dispatcher sign in logic
-  console.log('Dispatcher sign in')
+const handleSignIn = async () => {
+  errorMessage.value = ''
+
+  try {
+    localStorage.removeItem('authToken')
+    localStorage.removeItem('authRole')
+    localStorage.removeItem('authFirstName')
+    localStorage.removeItem('authLastName')
+
+    const response = await axios.post(
+      'http://127.0.0.1:8000/api/login/',
+      {
+        email: email.value,
+        password: password.value
+      }
+    )
+
+    const token = response.data?.token || response.data?.access || response.data?.access_token
+    const role = response.data?.role_id ?? response.data?.role ?? response.data?.user?.role_id
+    const firstName = response.data?.first_name || response.data?.user?.first_name || ''
+    const lastName = response.data?.last_name || response.data?.user?.last_name || ''
+
+    if (!token) {
+      errorMessage.value = 'Login failed. No authentication token was returned.'
+      return
+    }
+
+    if (String(role) !== '2') {
+      errorMessage.value = 'Access denied. Responders only.'
+      return
+    }
+
+    localStorage.setItem('authToken', token)
+    localStorage.setItem('authRole', String(role))
+    localStorage.setItem('authFirstName', firstName)
+    localStorage.setItem('authLastName', lastName)
+    axios.defaults.headers.common.Authorization = `Bearer ${token}`
+
+    router.push('/DispatchDashboard')
+  } catch (error) {
+    if (error.response) {
+      if (error.response.status === 400 || error.response.status === 401) {
+        errorMessage.value = 'Invalid email or password.'
+        return
+      }
+
+      if (error.response.data?.detail) {
+        errorMessage.value = error.response.data.detail
+        return
+      }
+
+      if (error.response.data?.error) {
+        errorMessage.value = error.response.data.error
+        return
+      }
+
+      errorMessage.value = 'Login failed. Please try again.'
+    } else {
+      errorMessage.value = 'Network error. Please check your connection and try again.'
+    }
+  }
 }
 </script>
 
@@ -31,19 +94,23 @@ const handleSignIn = () => {
       
       <form @submit.prevent="handleSignIn">
         <input 
-          type="text" 
-          placeholder="Username or Email" 
+          type="email" 
+          v-model="email"
+          placeholder="Email" 
           class="input-field"
           required
         />
         <input 
           type="password" 
+          v-model="password"
           placeholder="Password" 
           class="input-field"
           required
         />
         <button type="submit" class="btn btn-signin">Sign In</button>
       </form>
+
+      <p v-if="errorMessage" class="error-text">{{ errorMessage }}</p>
       
       <p class="footer-text">
         By using this service, you understand and agree to the PULSE Online Services
@@ -149,6 +216,13 @@ form {
   background-color: #b91c1c;
   transform: translateY(-2px);
   box-shadow: 0 4px 12px rgba(220, 38, 38, 0.4);
+}
+
+.error-text {
+  color: #dc2626;
+  font-size: 14px;
+  text-align: center;
+  margin-bottom: 16px;
 }
 
 .footer-text {

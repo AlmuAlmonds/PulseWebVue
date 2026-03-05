@@ -11,6 +11,7 @@ const router = useRouter()
 
 const email = ref('')
 const password = ref('')
+const errorMessage = ref('')
 
 const goBack = () => {
   if (typeof props.onBack === 'function') {
@@ -22,7 +23,12 @@ const goBack = () => {
 }
 
 const handleSignIn = async () => {
+  errorMessage.value = ''
+
   try {
+    localStorage.removeItem('authToken')
+    localStorage.removeItem('authRole')
+
     const response = await axios.post(
       "http://127.0.0.1:8000/api/login/",
       {
@@ -31,16 +37,46 @@ const handleSignIn = async () => {
       }
     )
 
-    alert(response.data.message)
+    const token = response.data?.token || response.data?.access || response.data?.access_token
+    const role = response.data?.role_id ?? response.data?.role ?? response.data?.user?.role_id
+
+    if (!token) {
+      errorMessage.value = 'Login failed. No authentication token was returned.'
+      return
+    }
+
+    if (String(role) !== '1') {
+      errorMessage.value = 'Access denied. Admins only.'
+      return
+    }
+
+    localStorage.setItem('authToken', token)
+    localStorage.setItem('authRole', String(role))
+    axios.defaults.headers.common.Authorization = `Bearer ${token}`
 
     // redirect to admin dashboard
-    router.push('/admindashboard')
+    router.push('/AdminDashboard')
 
   } catch (error) {
-    if (error.response && error.response.data) {
-      alert(JSON.stringify(error.response.data))
+    if (error.response) {
+      if (error.response.status === 400 || error.response.status === 401) {
+        errorMessage.value = 'Invalid email or password.'
+        return
+      }
+
+      if (error.response.data?.detail) {
+        errorMessage.value = error.response.data.detail
+        return
+      }
+
+      if (error.response.data?.error) {
+        errorMessage.value = error.response.data.error
+        return
+      }
+
+      errorMessage.value = 'Login failed. Please try again.'
     } else {
-      alert("Login failed")
+      errorMessage.value = 'Network error. Please check your connection and try again.'
     }
   }
 }
@@ -72,6 +108,8 @@ const handleSignIn = async () => {
 
   <button type="submit" class="btn btn-signin">Sign In</button>
 </form>
+
+      <p v-if="errorMessage" class="error-text">{{ errorMessage }}</p>
       
       <p class="footer-text">
         By using this service, you understand and agree to the PULSE Online Services
@@ -177,6 +215,13 @@ form {
   background-color: #1d4ed8;
   transform: translateY(-2px);
   box-shadow: 0 4px 12px rgba(37, 99, 235, 0.4);
+}
+
+.error-text {
+  color: #dc2626;
+  font-size: 14px;
+  text-align: center;
+  margin-bottom: 16px;
 }
 
 .footer-text {
